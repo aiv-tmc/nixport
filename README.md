@@ -20,7 +20,7 @@ With flakes:
 
 ```nix
 {
-  inputs.nixport.url = "path:/path/to/nixport";
+  inputs.nixport.url = "path:/path/to/nixport"; # or your repository URL
   # ...
   environment.systemPackages = [ inputs.nixport.packages.${pkgs.system}.default ];
 }
@@ -31,8 +31,6 @@ Without flakes:
 ```nix
 environment.systemPackages = [ (pkgs.callPackage /path/to/nixport/package.nix { }) ];
 ```
-
-`nixport install` requires `security.polkit.enable = true;`. You can add the project to your own package repository with the `scripts/install-to-repo.sh` script (see below).
 
 ## Quick start
 
@@ -72,22 +70,14 @@ cargo build
 cargo clippy --all-targets -- -D warnings
 cargo test
 nix build .#nixport
-bash scripts/smoke.sh ./result/bin/nixport
-NIXPORT_SMOKE_RUN=1 bash scripts/smoke.sh ./result/bin/nixport   # includes a real run
 ```
+
+Project rules: comments in English only and only about current behavior; source files no longer than 300 lines; no dead code or stubs.
 
 ## CI/CD
 
 - `.github/workflows/ci.yml`: rustfmt, clippy, tests, file-size limit, package build, `nix flake check`, and a `pack` + `info` smoke test.
 - `.github/workflows/release.yml`: on a `vX.Y.Z` tag (the version must match `Cargo.toml`), verifies the build and publishes a release with the source archive.
-
-## Adding the project to a Nix package repository
-
-```sh
-bash scripts/install-to-repo.sh /path/to/repository            # pkgs/by-name/ni/nixport
-bash scripts/install-to-repo.sh --layout flat /path/to/repository   # pkgs/nixport
-bash scripts/install-to-repo.sh --dry-run --check /path/to/repository
-```
 
 The script copies `Cargo.toml`, `Cargo.lock`, `package.nix`, and `src/`; it does not modify anything else in the repository and prints instructions for registering the package.
 
