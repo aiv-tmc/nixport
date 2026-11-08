@@ -71,13 +71,10 @@ cargo fmt                     # run once to format the code according to rustfmt
 cargo build
 cargo clippy --all-targets -- -D warnings
 cargo test
-bash scripts/check-size.sh    # no source file longer than 300 lines
 nix build .#nixport
 bash scripts/smoke.sh ./result/bin/nixport
 NIXPORT_SMOKE_RUN=1 bash scripts/smoke.sh ./result/bin/nixport   # includes a real run
 ```
-
-Project rules: comments in English only and only about current behavior; source files no longer than 300 lines; no dead code or stubs.
 
 ## CI/CD
 
