@@ -1,0 +1,12 @@
+[package]
+name = "nixport"
+version = "0.2.0"
+edition = "2021"
+description = "Portable Nix applications in a single file"
+
+[dependencies]
+
+[profile.release]
+opt-level = 3
+lto = true
+strip = true
