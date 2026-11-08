@@ -156,7 +156,11 @@ impl Meta {
     /// Renders the manifest as one JSON object for graphical shells.
     /// `icon` is the icon file extension, or null when there is no icon.
     pub fn to_json(&self) -> String {
-        let icon = if self.icon_ext.is_empty() { "null".to_string() } else { js(&self.icon_ext) };
+        let icon = if self.icon_ext.is_empty() {
+            "null".to_string()
+        } else {
+            js(&self.icon_ext)
+        };
         object(&[
             ("id", js(&self.id)),
             ("name", js(&self.name)),

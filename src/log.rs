@@ -82,6 +82,9 @@ mod tests {
     #[test]
     fn objects_and_arrays_are_composed() {
         let list = ja(&["x".to_string(), "y".to_string()]);
-        assert_eq!(object(&[("list", list), ("n", "3".to_string())]), "{\"list\":[\"x\",\"y\"],\"n\":3}");
+        assert_eq!(
+            object(&[("list", list), ("n", "3".to_string())]),
+            "{\"list\":[\"x\",\"y\"],\"n\":3}"
+        );
     }
 }

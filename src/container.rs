@@ -70,7 +70,13 @@ pub fn read(path: &Path) -> Result<Layout> {
     let Some(store_off) = config_off.checked_add(config_len) else {
         return fail("the archive header is corrupt");
     };
-    Ok(Layout { meta, icon, config_off, config_len, store_off })
+    Ok(Layout {
+        meta,
+        icon,
+        config_off,
+        config_len,
+        store_off,
+    })
 }
 
 /// Writes an archive front to back. The two payload sections are produced by

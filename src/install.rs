@@ -19,7 +19,9 @@ use std::process::{Command, Stdio};
 /// The absolute path of the nixport launcher as the user started it. The
 /// launcher (not the raw binary) is needed because it provides `PATH`.
 fn launcher() -> Result<PathBuf> {
-    let argv0 = std::env::args().next().ok_or_else(|| Error("cannot determine the program name".into()))?;
+    let argv0 = std::env::args()
+        .next()
+        .ok_or_else(|| Error("cannot determine the program name".into()))?;
     let found = which(&argv0).ok_or_else(|| Error(format!("cannot locate {argv0}")))?;
     Ok(fs::canonicalize(found)?)
 }
@@ -32,7 +34,11 @@ fn elevate(file: &Path, user: Option<String>) -> Result<()> {
         None => capture(Command::new("id").arg("-un"))?,
     };
     let setuid_pkexec = Path::new("/run/wrappers/bin/pkexec");
-    let pkexec = if setuid_pkexec.exists() { setuid_pkexec.to_path_buf() } else { which("pkexec").unwrap_or_else(|| PathBuf::from("pkexec")) };
+    let pkexec = if setuid_pkexec.exists() {
+        setuid_pkexec.to_path_buf()
+    } else {
+        which("pkexec").unwrap_or_else(|| PathBuf::from("pkexec"))
+    };
 
     let mut cmd = Command::new(pkexec);
     cmd.arg(launcher()?);
@@ -47,14 +53,24 @@ fn elevate(file: &Path, user: Option<String>) -> Result<()> {
 /// The home directory of `user` according to the passwd database.
 fn home_of(user: &str) -> Result<String> {
     let entry = capture(Command::new("getent").arg("passwd").arg(user))?;
-    entry.split(':').nth(5).map(str::to_string).ok_or_else(|| Error(format!("cannot find the home directory of {user}")))
+    entry
+        .split(':')
+        .nth(5)
+        .map(str::to_string)
+        .ok_or_else(|| Error(format!("cannot find the home directory of {user}")))
 }
 
 /// Prepares a command that runs `program` as `user` with that user's
 /// `HOME` and `USER`.
 fn as_user(user: &str, home: &str, program: &str) -> Command {
     let mut cmd = Command::new("runuser");
-    cmd.arg("-u").arg(user).arg("--").arg("env").arg(format!("HOME={home}")).arg(format!("USER={user}")).arg(program);
+    cmd.arg("-u")
+        .arg(user)
+        .arg("--")
+        .arg("env")
+        .arg(format!("HOME={home}"))
+        .arg(format!("USER={user}"))
+        .arg(program);
     cmd
 }
 
@@ -82,7 +98,9 @@ fn install_as_root(file: &Path, layout: &Layout, user: &str) -> Result<()> {
     log::event("adding the program to the user profile", &[]);
     let main = &layout.meta.roots[0];
     let mut profile = as_user(user, &home, "nix");
-    profile.args(["profile", "install", "--extra-experimental-features", "nix-command flakes"]).arg(main);
+    profile
+        .args(["profile", "install", "--extra-experimental-features", "nix-command flakes"])
+        .arg(main);
     if succeeds(&mut profile)? {
         return Ok(());
     }

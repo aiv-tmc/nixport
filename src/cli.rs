@@ -123,7 +123,10 @@ fn parse_install(mut args: Args) -> Result<Action> {
             file = Some(PathBuf::from(arg));
         }
     }
-    Ok(Action::Install { file: require_file(file, "install")?, user })
+    Ok(Action::Install {
+        file: require_file(file, "install")?,
+        user,
+    })
 }
 
 fn parse_info(mut args: Args) -> Result<Action> {
@@ -138,7 +141,10 @@ fn parse_info(mut args: Args) -> Result<Action> {
             file = Some(PathBuf::from(arg));
         }
     }
-    Ok(Action::Info { file: require_file(file, "info")?, icon_out })
+    Ok(Action::Info {
+        file: require_file(file, "info")?,
+        icon_out,
+    })
 }
 
 /// Parses the arguments that follow the program name.
@@ -157,7 +163,9 @@ pub fn parse(args: Vec<String>) -> Result<Cli> {
         Some("run") => parse_run(args)?,
         Some("install") => parse_install(args)?,
         Some("info") => parse_info(args)?,
-        Some("clean") => Action::Clean { file: args.next().map(PathBuf::from) },
+        Some("clean") => Action::Clean {
+            file: args.next().map(PathBuf::from),
+        },
         Some(other) => return fail(format!("unknown command: {other}\n\n{USAGE}")),
     };
     Ok(Cli { json, action })

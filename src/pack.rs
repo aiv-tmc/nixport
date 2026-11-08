@@ -47,7 +47,10 @@ fn select_config(options: &Options, target: &Target) -> Result<Vec<String>> {
     if options.no_config {
         return Ok(Vec::new());
     }
-    let program = Path::new(&target.argv[0]).file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+    let program = Path::new(&target.argv[0])
+        .file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .unwrap_or_default();
     let names = vec![
         resolve::pname(&target.roots[0]),
         program,
@@ -83,7 +86,15 @@ fn load_icon(target: &Target, closure: &[String]) -> Result<(Vec<u8>, String)> {
 
 /// Replaces characters that are unsafe in file names.
 fn sanitize(name: &str) -> String {
-    name.chars().map(|c| if c.is_alphanumeric() || matches!(c, '.' | '-' | '_') { c } else { '_' }).collect()
+    name.chars()
+        .map(|c| {
+            if c.is_alphanumeric() || matches!(c, '.' | '-' | '_') {
+                c
+            } else {
+                '_'
+            }
+        })
+        .collect()
 }
 
 /// Output file: the given path, or `<name>.nixport` inside the given directory
@@ -171,10 +182,21 @@ pub fn run(options: Options) -> Result<()> {
 
     log::event(
         "packing",
-        &[("paths", closure.len().to_string()), ("config", ja(&meta.config_paths)), ("output", js(&output.display().to_string()))],
+        &[
+            ("paths", closure.len().to_string()),
+            ("config", ja(&meta.config_paths)),
+            ("output", js(&output.display().to_string())),
+        ],
     );
     write_archive(&output, &meta, &icon_bytes, &closure, options.level)?;
     let size = fs::metadata(&output).map(|m| m.len()).unwrap_or(0);
-    log::event("done", &[("output", js(&output.display().to_string())), ("size", size.to_string()), ("id", js(&meta.id))]);
+    log::event(
+        "done",
+        &[
+            ("output", js(&output.display().to_string())),
+            ("size", size.to_string()),
+            ("id", js(&meta.id)),
+        ],
+    );
     Ok(())
 }
