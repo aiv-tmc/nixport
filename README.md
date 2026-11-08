@@ -20,7 +20,7 @@ With flakes:
 
 ```nix
 {
-  inputs.nixport.url = "path:/path/to/nixport"; # or your repository URL
+  inputs.nixport.url = "path:/path/to/nixport";
   # ...
   environment.systemPackages = [ inputs.nixport.packages.${pkgs.system}.default ];
 }
