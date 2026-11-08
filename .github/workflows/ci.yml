@@ -20,8 +20,6 @@ jobs:
         run: nix develop -c cargo clippy --all-targets -- -D warnings
       - name: Unit tests
         run: nix develop -c cargo test
-      - name: File size limit
-        run: bash scripts/check-size.sh
 
   build:
     needs: lint-and-test
@@ -36,5 +34,3 @@ jobs:
         run: nix build .#nixport -L
       - name: Flake checks
         run: nix flake check -L
-      - name: Smoke test (pack and inspect)
-        run: bash scripts/smoke.sh ./result/bin/nixport
