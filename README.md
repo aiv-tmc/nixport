@@ -1,18 +1,50 @@
 # Nixport
 
-Nixport packages a program from Nix into a single compressed `.nixport` file that you can carry on a USB drive and run on another device with the same distribution—without installing it into the system, and together with its settings. If desired, the same program can also be installed system-wide.
+**Portable Nix applications in a single file.**
 
-The file stores the program name and icon in its header, so a graphical frontend can display them without unpacking the archive.
+Nixport packs a program from the Nix store, its complete closure and, optionally, the user's
+settings into one compressed `.nixport` file. Copy the file to a USB stick and open it on
+another machine with Nixport: the program starts without installation and without changes
+outside your home directory. The same file can install the program into the system if you
+want to keep it.
 
-> The project is written in Rust with no external dependencies. It requires `nix`, `bubblewrap` (version 0.11 or newer), `zstd`, and `tar`; the Nix package pulls them in automatically.
+The file also carries the program's **name and icon** in a small header, so a file manager
+or desktop shell can display it without unpacking anything.
 
-## How it works
+## Features
 
-- **pack** computes the program’s closure (`nix-store -qR`), exports it (`nix-store --export`), compresses it with zstd, and writes it to a single file together with the name, icon, and any discovered user settings.
-- **run** imports the closure into a private store at `~/.cache/nixport/<id>` and launches the program in `bwrap`, with that store overlaid on top of `/nix/store`. The system is not modified. Settings are mounted over `~/.config/<app>` from a separate copy, so the host’s settings are left untouched.
-- **install** imports the closure into the real `/nix/store` (via `pkexec`), restores the settings without overwriting existing files, and adds the program to the user profile.
+- **One file per program:** closure, settings, name and icon.
+- **Run without installing:** the program starts in a private mount namespace; the host
+  `/nix/store` and the rest of the system are left untouched.
+- **Portable settings:** your configuration travels with the file and is applied without
+  modifying the settings of the machine you run it on.
+- **Optional installation** into the system with a single command.
+- **Scriptable:** every command is non-interactive and can report progress as JSON lines,
+  which makes it easy to build a graphical interface on top.
+- **Small and dependency-free:** written in Rust using only the standard library;
+  compression and archiving are delegated to `zstd` and `tar`.
 
-Details: [docs/architecture.md](docs/architecture.md). File format: [docs/archive-format.md](docs/archive-format.md).
+## Status
+
+Nixport is at version 0.2.0. It targets NixOS on `x86_64-linux` and `aarch64-linux`.
+`run` relies on overlay mounts inside user namespaces, which depends on your kernel
+configuration; see [Requirements](#requirements) and
+[docs/troubleshooting.md](docs/troubleshooting.md).
+
+## Requirements
+
+| Requirement | Why |
+|---|---|
+| Linux with Nix (NixOS recommended) | the program closure comes from and runs on `/nix/store` |
+| `bubblewrap` 0.11 or newer | overlay of the unpacked closure on `/nix/store` (`nixport run`) |
+| Linux 5.11+, unprivileged user namespaces enabled | overlay mounts without root |
+| `zstd`, `tar`, `coreutils`, `util-linux`, `glibc` (`getent`) | compression, archiving, user switching |
+| polkit | privilege elevation for `nixport install` |
+
+The Nix package wraps the binary so that all helper tools are found automatically.
+
+Open an archive on the same CPU architecture it was created on. For predictable graphics and
+driver behaviour, use the same distribution (or at least a similar nixpkgs) on both machines.
 
 ## Installation
 
@@ -20,70 +52,96 @@ With flakes:
 
 ```nix
 {
-  inputs.nixport.url = "path:/path/to/nixport"; # or your repository URL
-  # ...
-  environment.systemPackages = [ inputs.nixport.packages.${pkgs.system}.default ];
+  inputs.nixport.url = "github:aiv-tmc/nixport";
+
+  outputs = { nixpkgs, nixport, ... }: {
+    nixosConfigurations.myhost = nixpkgs.lib.nixosSystem {
+      modules = [
+        ({ pkgs, ... }: {
+          environment.systemPackages = [ nixport.packages.${pkgs.system}.default ];
+          security.polkit.enable = true; # needed by `nixport install`
+        })
+      ];
+    };
+  };
 }
 ```
 
-Without flakes:
+Without flakes, from a checkout:
 
 ```nix
 environment.systemPackages = [ (pkgs.callPackage /path/to/nixport/package.nix { }) ];
 ```
 
+Try it without installing: `nix run github:aiv-tmc/nixport -- --help`.
+
 ## Quick start
 
 ```sh
-# package a program from a launcher directly onto a USB drive
-nixport pack /run/current-system/sw/share/applications/firefox.desktop -o /run/media/user/USB/
+# 1. Pack a program straight onto a USB stick.
+nixport pack /run/current-system/sw/share/applications/firefox.desktop -o /run/media/me/USB/
 
-# view the name and icon
-nixport info /run/media/user/USB/Firefox.nixport --icon-out /tmp/icon.png
+# 2. Inspect the contents (name, icon, size, included settings).
+nixport info /run/media/me/USB/Firefox.nixport --icon-out /tmp/icon.svg
 
-# run without installing
-nixport run /run/media/user/USB/Firefox.nixport
+# 3. On any machine with Nixport: run it without installing.
+nixport run /run/media/me/USB/Firefox.nixport
 
-# install system-wide
-nixport install /run/media/user/USB/Firefox.nixport
+# 4. Or install it permanently (asks for administrator rights).
+nixport install /run/media/me/USB/Firefox.nixport
+```
+
+`pack` also accepts a command, a store path or a flake reference:
+
+```sh
+nixport pack hello -o .
+nixport pack nixpkgs#hello -o .
+nixport pack /nix/store/…-hello-2.12 -o .
 ```
 
 ## Commands
 
 | Command | Purpose |
 |---|---|
-| `pack TARGET [-o PATH] [--exec NAME] [--no-config] [--config-path REL]... [--level 1-19]` | Create a `.nixport`. `TARGET`: `.desktop` file, command, store path, or flake (`nixpkgs#hello`) |
-| `run [--no-config] FILE [ARGS...]` | Run without installing |
-| `install [--user NAME] FILE` | Install system-wide |
-| `info FILE [--icon-out PATH]` | Print the manifest as JSON and save the icon |
-| `clean [FILE]` | Remove unpacked programs from the cache |
+| `pack TARGET` | create a `.nixport` file |
+| `run FILE [ARGS…]` | start the packed program without installing it |
+| `install FILE` | install the packed program into the system |
+| `info FILE` | print the manifest as JSON, optionally extract the icon |
+| `clean [FILE]` | delete unpacked programs from the cache |
 
-The global `--json` flag (placed before the command) enables line-delimited JSON output for frontends: [docs/shell-integration.md](docs/shell-integration.md).
+Put `--json` before the command to get machine-readable progress and errors.
+Full reference: [docs/cli-reference.md](docs/cli-reference.md).
 
-## Development
+## Documentation
 
-```sh
-git init && git add -A        # flakes only see files tracked by git
-nix develop                   # cargo, clippy, rustfmt, bwrap, zstd
-cargo fmt                     # run once to format the code according to rustfmt.toml
-cargo build
-cargo clippy --all-targets -- -D warnings
-cargo test
-nix build .#nixport
-```
+| Document | Audience | Contents |
+|---|---|---|
+| [User guide](docs/user-guide.md) | everyone | concepts, workflows, settings, disk space, updating |
+| [CLI reference](docs/cli-reference.md) | everyone | every command, option, exit code, file and variable |
+| [How it works](docs/how-it-works.md) | curious users, contributors | pipeline of each command, on-disk layout, design decisions |
+| [Archive format](docs/archive-format.md) | tool authors | byte-level format of `.nixport` and its manifest |
+| [Shell integration](docs/shell-integration.md) | desktop-shell developers | JSON events, drag-and-drop flow, examples |
+| [Security](docs/security.md) | everyone | trust model, what is and is not protected |
+| [Troubleshooting](docs/troubleshooting.md) | everyone | common errors and fixes, FAQ |
+| [Development](docs/development.md) | contributors | building, testing, conventions, releases |
+| [Publishing](docs/publishing.md) | maintainers | GitHub and nixpkgs submission notes |
 
-Project rules: comments in English only and only about current behavior; source files no longer than 300 lines; no dead code or stubs.
-
-## CI/CD
-
-- `.github/workflows/ci.yml`: rustfmt, clippy, tests, file-size limit, package build, `nix flake check`, and a `pack` + `info` smoke test.
-- `.github/workflows/release.yml`: on a `vX.Y.Z` tag (the version must match `Cargo.toml`), verifies the build and publishes a release with the source archive.
-
-The script copies `Cargo.toml`, `Cargo.lock`, `package.nix`, and `src/`; it does not modify anything else in the repository and prints instructions for registering the package.
+Русская версия обзора: [README.ru.md](README.ru.md).
 
 ## Limitations
 
-- The archive is tied to a platform (`x86_64-linux`, etc.) and must be opened on the same distribution.
-- Settings may include application tokens and sessions: the frontend should show the user the list from the `packing` event and allow disabling it (`--no-config`).
-- FAT32 cannot store files larger than 4 GB; use exFAT or ext4.
-- Troubleshooting: [docs/troubleshooting.md](docs/troubleshooting.md).
+- Archives are tied to a CPU architecture and to Linux.
+- `run` is not a security sandbox: the program sees your home directory and the whole host.
+- Settings may contain secrets (sessions, tokens). Review them before sharing a file.
+- Archives are neither signed nor encrypted.
+- FAT32 cannot hold files larger than 4 GiB; use exFAT or ext4 on the stick.
+- Programs whose desktop entry starts with a wrapper such as `env VAR=… app` are not
+  recognised; pack the program directly instead.
+
+## Contributing and security
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) and [SECURITY.md](SECURITY.md).
+
+## License
+
+See the `LICENSE` file in the repository.
